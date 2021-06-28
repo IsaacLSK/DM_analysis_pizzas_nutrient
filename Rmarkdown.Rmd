@@ -61,7 +61,7 @@ library(pls) ## PLS, PLSR
 
 # Data Fetching
 ```{r fetching}
-mydata = data.frame(read.csv("C:\\Users\\LSK\\OneDrive - The Open Unviersity of Hong Kong\\r project\\Pizza.csv"))
+mydata = data.frame(read.csv("C:\\Users\\LSK\\r project\\Pizza.csv"))
 ```
 
 # 4. Data description
