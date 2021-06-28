@@ -1,0 +1,386 @@
+---
+title: "STAT S460F final project"
+author: "Siu Kwok Lai, 12354991"
+date: "2020/11/27"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# List of packages
+```{r packages, eval=FALSE}
+install.packages("tidyr")
+install.packages("devtools")
+install_github("vqv/ggbiplot")
+install.packages("ISLR")
+install.packages("ggplot2")
+install.packages("epiDisplay")
+install.packages("leaps")
+install.packages("PerformanceAnalytics")
+install.packages("factoextra")
+install.packages("ggbiplot")
+install.packages("ggpubr")
+install.packages("dplyr")
+install.packages("ISLR")
+install.packages("e1071")
+install.packages("car")
+install.packages("PreProcess")
+install.packages("glmnet")
+install.packages("pls")
+```
+
+# List of libraries 
+```{r acces lib, message=FALSE}
+library(tidyr) ## Handle data
+library(devtools)## Important to install ggbiplot
+library(ISLR) ## Data Mining Package
+library(ggplot2) ## Graphs
+library(epiDisplay) ## One way Analysis
+library(leaps) ### Predict
+library(PerformanceAnalytics) ## Correlation
+library(factoextra) ## Extract and Visualize result
+library(ggbiplot) ## Graphs
+library(ggpubr) ## qqplot
+library(dplyr) ## Manipulation
+library(ISLR) ## Data
+library(e1071) ## SVM
+library(car) ## Simple analysis
+library(PreProcess) ## Handle data
+library(glmnet) ## Graphs
+library(pls) ## PLS, PLSR
+```
+
+# Data Fetching
+```{r fetching}
+mydata = data.frame(read.csv("C:\\Users\\LSK\\OneDrive - The Open Unviersity of Hong Kong\\r project\\Pizza.csv"))
+```
+
+# 4. Data description
+
+## Dataset(Mydata) Manipulation
+```{r dataset manipulation}
+dim(mydata)
+sum(is.na(mydata)) ## count if missing, and no missing data existing
+head(mydata)
+str(mydata) 
+
+names(mydata)[3:9] = c("water", "protein", "fat", "ash", "sodium", "carbohydrates", "calories")
+
+mydata$brand = as.factor(mydata$brand)
+mydata$id = as.integer(mydata$id)
+str(mydata)
+
+mydata= mydata[,-2]
+str(mydata)
+```
+
+
+## Split data
+```{r split mydata}
+set.seed(1)
+train = mydata %>%
+sample_frac(0.5)
+test = mydata %>%
+setdiff(train)
+
+dim(train)
+dim(test)
+```
+
+# 5. Exploratory and descriptive analysis of data
+
+## Descriptive and exploratory analysis of each variable 
+```{r Descriptive1}
+
+tab1(mydata$brand, cum.percent = TRUE,main = "brand")
+
+summary(mydata$calories)
+hist(mydata$calories,main="Histogram of calories (per 100 grams)", freq=F, breaks=10, ylim=c(0,1))
+lines(density(mydata$calories), col="red")
+lines(seq(1, 5, by=.1), dnorm(seq(1, 5, by=.1),
+      mean(mydata$calories), sd(mydata$calories)), col="blue")
+
+summary(mydata$water)
+hist(mydata$water,main="Histogram of water (per 100 grams)", freq=F, breaks=10, xlim = c(20,60))
+lines(density(mydata$water), col="red")
+lines(seq(20, 60, by=.5), dnorm(seq(20, 60, by=.5),
+      mean(mydata$water), sd(mydata$water)), col="blue")
+
+summary(mydata$protein)
+hist(mydata$protein,main="Histogram of protein (per 100 grams)", freq=F, xlim = c(1,30))
+lines(density(mydata$protein), col="red")
+lines(seq(0, 30, by=.1), dnorm(seq(0, 30, by=.1),
+      mean(mydata$protein), sd(mydata$protein)), col="blue")
+
+summary(mydata$fat)
+hist(mydata$fat,main="Histogram of fat (per 100 grams)", freq=F, ylim=c(0,0.1))
+lines(density(mydata$fat), col="red")
+lines(seq(0, 50, by=.5), dnorm(seq(0, 50, by=.5),
+      mean(mydata$fat), sd(mydata$fat)), col="blue")
+
+summary(mydata$ash)
+hist(mydata$ash,main="Histogram of ash (per 100 grams)", freq=F, xlim = c(0,6))
+lines(density(mydata$ash), col="red")
+lines(seq(0, 6, by=.1), dnorm(seq(0, 6, by=.1),
+      mean(mydata$ash), sd(mydata$ash)), col="blue")
+
+summary(mydata$sodium)
+hist(mydata$sodium,main="Histogram of sodium (per 100 grams)", freq=F,xlim = c(0,2), ylim=c(0,3.5))
+lines(density(mydata$sodium), col="red")
+lines(seq(0, 2, by=.1), dnorm(seq(0, 2, by=.1),
+      mean(mydata$sodium), sd(mydata$sodium)), col="blue")
+
+summary(mydata$carbohydrates)
+hist(mydata$carbohydrates,main="Histogram of carbohydrates (per 100 grams)", freq=F)
+lines(density(mydata$carbohydrates), col="red")
+lines(seq(0, 50, by=.5), dnorm(seq(0, 50, by=.5),
+      mean(mydata$carbohydrates), sd(mydata$carbohydrates)), col="blue")
+
+
+boxplot(mydata)
+
+chart.Correlation(mydata[, -1], histogram=TRUE, pch=19)
+
+```
+
+
+## Diagnostic plots - multiple linear regression model
+
+```{r lm}
+data.lm = lm(calories ~ ., data = mydata)
+plot(data.lm) 
+
+```
+
+# 6. Analysis of data based on given objectives
+
+## Objective 1
+
+### Ridge/Lasso preparation 
+```{r R and L}
+
+x_train = model.matrix(calories~., train[,-1])[,-1]
+x_test = model.matrix(calories~., test[,-1])[,-1]
+
+y_train = train[-1] %>%
+select(calories) %>%
+unlist() %>%
+as.numeric()
+
+y_test = test[-1] %>%
+select(calories) %>%
+unlist() %>%
+as.numeric()
+
+
+grid = 10^seq(10, -2, length = 100)
+```
+
+### Ridge regression model 
+```{r ridge}
+ridge_mod = glmnet(x_train, y_train, alpha=0, lambda = grid)
+ridge_pred = predict(ridge_mod, s = 4, newx = x_test)
+
+mean((ridge_pred - y_test)^2)
+plot(ridge_mod)
+
+set.seed(1)
+cv.out = cv.glmnet(x_train, y_train, alpha = 0) # Fit ridge regression model on training 
+bestlam = cv.out$lambda.min # Select lambda that minimizes training MSE
+bestlam
+plot(cv.out) # Draw plot of training MSE as a function of lambda
+
+ridge_mod=glmnet(x_train, y_train, alpha = 0, lambda = bestlam)
+coef(ridge_mod)
+
+ridge_pred = predict(ridge_mod, s = bestlam, newx = x_test) # Use best lambda to predict 
+mean((ridge_pred - y_test)^2) # Calculate test MSE
+
+
+```
+
+### Lasso regression model 
+```{r Lasso}
+lasso_mod = glmnet(x_train, y_train, alpha=1, lambda = grid)
+lasso_pred = predict(lasso_mod, s=4, newx = x_test)
+
+mean((lasso_pred - y_test)^2)
+plot(lasso_mod)
+
+set.seed(1)
+cv.out = cv.glmnet(x_train, y_train, alpha=1)
+bestlam = cv.out$lambda.min
+bestlam
+plot(cv.out)
+
+lasso_mod=glmnet(x_train, y_train, alpha = 1, lambda = bestlam)
+coef(lasso_mod)
+
+lasso_pred = predict(lasso_mod, s = bestlam, newx = x_test)
+mean((lasso_pred - y_test)^2) # MSE
+
+lasso_lm = lm(calories~water+protein+fat+ash, data=test)
+summary(lasso_lm)
+vif(lasso_lm)
+
+```
+
+### PCR
+```{r PCR}
+
+set.seed(1)
+pcr_fit = pcr(calories~., data = train[,-1], scale = TRUE, validation = "CV")
+summary(pcr_fit)
+
+
+validationplot(pcr_fit, val.type = "MSEP")
+plot(pcr_fit, "loadings") 
+plot(pcr_fit, "coef") # Coefficients
+
+pcr_pred = predict(pcr_fit, x_test, ncomp=2)
+mean((pcr_pred-y_test)^2)
+coef(pcr_fit,2)
+
+
+```
+
+### PLSR
+```{r PLSR}
+set.seed(1)
+pls_fit = plsr(calories~., data = train[,-1], scale = TRUE, validation = "CV")
+summary(pls_fit)
+
+validationplot(pls_fit, val.type = "MSEP")
+pls_pred = predict(pls_fit, x_test, ncomp = 2)
+mean((pls_pred - y_test)^2) # MSE
+coef(pls_fit,2)
+
+```
+
+
+
+## Objective 2
+
+### PCA
+```{r pca}
+train.pca = prcomp(train[,c(-1,-8)], center = TRUE,scale. = TRUE)
+summary(train.pca)
+summary(train.pca)$rotation
+##summary(mydata.pca)$x
+fviz_eig(train.pca)
+
+ggbiplot(train.pca, ellipse=TRUE, groups=train$brand)
+
+fviz_pca_var(train.pca,
+col.var = "contrib", # Color by contributions to the PC
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel = TRUE # Avoid text overlapping
+)
+
+fviz_pca_biplot(train.pca, repel = TRUE,
+col.var = "#2E9FDF", # Variables color
+col.ind = "#696969" # Individuals color
+)
+
+# Eigenvalues
+eig.val= get_eigenvalue(train.pca)
+eig.val
+
+# Results for Variables
+res.var= get_pca_var(train.pca)
+res.var$coord # Coordinates
+
+res.var$contrib # Contributions to the PCs
+res.var$cos2 # Quality of representation
+
+```
+
+### SVM
+```{r svm}
+traning_brand = train$brand
+training_data = train[,c(4,7)]
+training_data = data.frame(training_data, brand = as.factor(traning_brand))
+
+testing_brand = test$brand
+testing_data = test[,c(4,7)]
+testing_data = data.frame(testing_data, brand = as.factor(testing_brand))
+
+
+ggplot(data.frame(training_data), aes(training_data$carbohydrates, training_data$fat, colour = traning_brand)) +
+geom_point()
+
+
+```
+
+### 10-folds cross-validation to find best cost and gamma
+```{r ten}
+brand = training_data$brand
+set.seed(1)
+tune_out=tune(svm,
+              factor(brand)~.,
+              data=training_data,
+              kernel="radial",
+              ranges = 
+                list(cost = c(0.1,1,10,50,100,500,1000),
+                     gamma = c(0.5,1,2,3,4,5,6,7,8,9,10)))
+              
+
+bestmod=tune_out$best.model
+summary(bestmod)
+plot(bestmod,training_data)
+
+
+```
+
+### Best values on testing dataset
+```{r SVM}
+svmfit = svm(testing_data$brand~., data = testing_data, kernel = "radial", cost = 50, gamma = 10)
+plot(svmfit, testing_data)
+
+```
+
+### The percentage of accuracy
+```{r final}
+pred_table = table(true = testing_data$brand, pred = predict(tune_out$best.model, newdata = testing_data))
+pred_table
+accuracy = sum(diag(pred_table))/nrow(testing_data)
+accuracy
+error = 1 - accuracy
+error
+
+```
+
+### bar chart
+```{r bar}
+
+new_fat = aggregate(mydata$fat, by=list(brand=mydata$brand), FUN=sum)
+new_carbo = aggregate(mydata$carbohydrates, by=list(brand=mydata$brand), FUN=sum)
+
+new_plotdata = cbind(new_fat,new_carbo[,-1])
+names(new_plotdata)[c(2,3)] = c('fat','carbohydrates')
+new_plotdata
+t(new_plotdata)
+
+dat = data.frame(
+  fat = new_plotdata$fat,
+  carbohydrates = new_plotdata$carbohydrates,
+  brands = as.factor(new_plotdata$brand)
+)
+
+dat_long <- dat %>%
+  gather("nutrients", "grams", -brands)
+
+ggplot(dat_long, aes(x = brands, y = grams, fill = nutrients)) + ggtitle("Total grams of effective nutrients by brands") +
+  geom_col(position = "dodge")
+
+```
+
